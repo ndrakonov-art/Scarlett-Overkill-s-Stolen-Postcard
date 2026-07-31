@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scarlett Overkill's Stolen Postcard</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            background-color: #0d0d0d; /* Этот фон будет виден в прогоревших дырах */
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            perspective: 2000px;
+            font-family: sans-serif;
+            position: relative;
+        }
+        
+        /* Главный контейнер открытки */
+        .card-container {
+            position: relative;
+            width: 42vw;
+            max-width: 350px; 
+            aspect-ratio: 700 / 1000; 
+            transform-style: preserve-3d;
+            cursor: pointer;
+            transition: transform 1.4s cubic-bezier(0.4, 0, 0.2, 1);
+            transform-origin: left center;
+        }
+
+        /* 1. ЛЕВАЯ ВНУТРЕННЯЯ СТОРОНА (Чистая птичка изначально) */
+        .inside-left {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: url('https://i.vgy.me/5Rkfi3.png');
+            background-size: 100% 100%;
+            background-position: center;
+            box-shadow: -15px 15px 40px rgba(0,0,0,0.6);
+            z-index: 1;
+            opacity: 0;
+            transition: opacity 0.4s ease;
+        }
+
+        /* 2. ЛЕВАЯ ВНУТРЕННЯЯ СТОРОНА (Сгоревшая птичка) */
+        .inside-left-burned {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: url('https://i.vgy.me/Ve9ULU.png');
+            background-size: 100% 100%;
+            background-position: center;
+            z-index: 3;
+            opacity: 0;
+            transition: opacity 3s ease-in-out; /* Медленное проявление за 3 секунды */
+            pointer-events: none;
+        }
+        .card-container.burn-active .inside-left-burned {
+            opacity: 1;
+        }
+
+        /* Поворотный механизм книги */
+        .cover-hinge {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100.5%; 
+            height: 100%;
+            transform-origin: left center;
+            transform-style: preserve-3d;
+            transition: transform 1.4s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 10;
+        }
+
+        .cover-side {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+        }
+
+        /* 3. ВНЕШНЯЯ СТОРОНА (Бордовая обложка) */
+        .cover-front {
+            background-image: url('https://i.vgy.me/dx4BmX.png');
+            background-size: 100% 100%;
+            background-position: center;
+            z-index: 2;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 15px 15px 40px rgba(0,0,0,0.6);
+        }
+
+        .cover-front::after {
+            content: "Нажми, чтобы открыть ✉️";
+            background: rgba(0, 0, 0, 0.7);
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: clamp(10px, 2.2vw, 15px);
+            animation: pulse 1.5s infinite;
+            white-space: nowrap;
+        }
+
+        /* 4. ПРАВАЯ ВНУТРЕННЯЯ СТОРОНА (Чистый текст изначально) */
+        .cover-back {
+            background-image: url('https://i.vgy.me/XkuTl1.png');
+            background-size: 100% 100%;
+            background-position: center;
+            transform: rotateY(180deg);
+            z-index: 1;
+        }
+
+        /* 5. СЛОЙ ПОЛНОГО ПРОГОРАНИЯ ПРАВОЙ СТРАНИЦЫ (Угли + D) */
+        .cover-back-burned {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: url('https://i.vgy.me/TK0c1y.png');
+            background-size: 100% 100%;
+            background-position: center;
+            z-index: 3;
+            opacity: 0;
+            transition: opacity 3s ease-in-out; /* Медленное проявление за 3 секунды */
+            transform: rotateY(180deg);
+            pointer-events: none;
+        }
+        .card-container.burn-active .cover-back-burned {
+            opacity: 1;
+        }
+
+        /* Механика анимации открытия */
+        .card-container.opened .cover-hinge {
+            transform: rotateY(-180deg);
+        }
+        .card-container.opened {
+            transform: translateX(50%);
+        }
+        .card-container.opened .inside-left {
+            opacity: 1;
+        }
+
+        /* ====================================================
+           ТОТАЛЬНОЕ ПЛАМЯ НА ВЕСЬ ЭКРАН И ДВЕ СТРАНИЦЫ ЦЕЛИКОМ
+           ==================================================== */
+        .full-page-fire {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%); 
+            width: 250vw; /* Раздули во весь экран с огромным запасом */
+            height: 250vh; 
+            z-index: 9999; 
+            pointer-events: none;
+            mix-blend-mode: screen; /* Убирает черный фон гифки */
+            opacity: 0;
+            background-size: 100% 100%; /* Растягиваем гифку жестко на всю ширину и высоту без полей */
+            background-position: center;
+            background-repeat: no-repeat;
+            background-image: url('https://i.vgy.me/Uj9uBg.gif');
+            transition: opacity 0.2s ease;
+        }
+        
+        /* Пожар длится ровно 4 секунды */
+        body.fire-active .full-page-fire {
+            opacity: 1;
+            animation: fireStormDuration 4s forwards; 
+        }
+        /* ==================================================== */
+
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 0.8; }
+            50% { transform: scale(1.05); opacity: 1; }
+            100% { transform: scale(1); opacity: 0.8; }
+        }
+
+        /* Анимация жизни огня на 4 секунды */
+        @keyframes fireStormDuration {
+            0% { transform: translate(-50%, -50%) scaleY(0.7); filter: brightness(1.7); }
+            12% { transform: translate(-50%, -50%) scaleY(1); filter: brightness(1); }
+            85% { opacity: 1; transform: translate(-50%, -50%) scaleY(1); }
+            100% { opacity: 0; transform: translate(-50%, -75%) scaleY(0); filter: blur(15px); } 
+        }
+     </style>
+</head>
+<!-- ========================================================================= -->
+<!-- АДАПТИВНЫЙ МОДУЛЬ С ДИНАМИЧЕСКИМ СИНХРОННЫМ РАСЧЕТОМ ДЛЯ СМАРТФОНОВ -->
+<!-- ========================================================================= -->
+<style>
+    /* Настройки координат для стандартного монитора ПК */
+    :root {
+        --bird-nowing-x: 175px;  
+        --bird-nowing-y: 0px;    
+        --wing-module-x: 130px;  
+        --wing-module-y: -35px;   
+        --wing-module-w: 500px;  
+        --wing-module-h: 500px;  
+    }
+
+    /* Глобальный слой правой страницы БЕЗ крыла */
+    .global-bird-nowing-page {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        /* Размеры будут подставляться скриптом динамически в такт оригинальной открытке */
+        width: var(--card-dynamic-w, 350px);
+        height: var(--card-dynamic-h, 500px);
+        transform: translate(-50%, -50%) translateX(var(--bird-nowing-x)) translateY(var(--bird-nowing-y));
+        /* 👇 СЮДА ВСТАВЬ ССЫЛКУ НА ЦЕЛЬНУЮ КАРТИНКУ ПРАВОЙ СТРАНИЦЫ (ГДЕ ПТИЧКА УЖЕ БЕЗ КРЫЛА) */
+        background-image: url('https://i.vgy.me/RFq6DE.png'); 
+        background-size: 100% 100%;
+        background-position: center;
+        z-index: 8000; 
+        opacity: 0;
+        transition: opacity 0.15s ease-in-out;
+        pointer-events: none;
+    }
+    body.wing-go .global-bird-nowing-page {
+        opacity: 1; 
+    }
+
+    /* Единый монолитный блок (Крыло + пружина на одном холсте) */
+    .global-wing-spring-module {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: var(--wing-module-w);
+        height: var(--wing-module-h);
+        transform: translate(-50%, -50%) translateX(var(--wing-module-x)) translateY(var(--wing-module-y));
+        transform-origin: left center; /* Точка фиксации пружины слева */
+        z-index: 8888;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.15s ease;
+    }
+
+    /* Врубаем пружинный отскок */
+    body.wing-go .global-wing-spring-module {
+        opacity: 1;
+        pointer-events: auto;
+        animation: realSpringEffect 1.4s cubic-bezier(0.25, 0.1, 0.25, 1.4) forwards;
+    }
+
+    /* Интерактивный кач при наведении */
+    .global-wing-spring-module:hover, .global-wing-spring-module:active {
+        animation: realSpringEffect 0.8s cubic-bezier(0.25, 0.1, 0.25, 1.4) !important;
+    }
+
+    /* Слой для твоей картинки (Крыло с QR + пружина) */
+    .wing-image-layer {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        /* 👇 СЮДА ВСТАВЬ ССЫЛКУ НА КАРТИНКУ КРЫЛА ВМЕСТЕ С ПРУЖИНОЙ НА ПРОЗРАЧНОМ ФОНЕ */
+        background-image: url('https://i.vgy.me/pBkD89.png'); 
+        background-size: contain;
+        background-repeat: no-repeat;
+        background-position: center;
+    }
+
+    /* Физика резкого вылета вперед и затухание колебаний */
+    @keyframes realSpringEffect {
+        0% { transform: translate(-50%, -50%) translateX(var(--wing-module-x)) translateY(var(--wing-module-y)) rotate(0deg) scale(0); filter: brightness(2); }
+        10% { transform: translate(-50%, -50%) translateX(var(--wing-module-x)) translateY(var(--wing-module-y)) rotate(-35deg) scale(1.2); filter: brightness(1.2); }
+        25% { transform: translate(-50%, -50%) translateX(var(--wing-module-x)) translateY(var(--wing-module-y)) rotate(18deg) scale(0.95); }
+        40% { transform: translate(-50%, -50%) translateX(var(--wing-module-x)) translateY(var(--wing-module-y)) rotate(-12deg) scale(1.05); }
+        55% { transform: translate(-50%, -50%) translateX(var(--wing-module-x)) translateY(var(--wing-module-y)) rotate(8deg) scale(0.98); }
+        70% { transform: translate(-50%, -50%) translateX(var(--wing-module-x)) translateY(var(--wing-module-y)) rotate(-4deg) scale(1.01); }
+        85% { transform: translate(-50%, -50%) translateX(var(--wing-module-x)) translateY(var(--wing-module-y)) rotate(2deg); }
+        100% { transform: translate(-50%, -50%) translateX(var(--wing-module-x)) translateY(var(--wing-module-y)) rotate(0deg) scale(1); }
+    }
+</style>
+
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        // Создаем глобальный слой для новой правой страницы без крыла
+        const birdNowing = document.createElement('div');
+        birdNowing.className = 'global-bird-nowing-page';
+        document.body.appendChild(birdNowing);
+
+        // Создаем глобальный контейнер для отлетающего крыла и пружины
+        const moduleContainer = document.createElement('div');
+        moduleContainer.className = 'global-wing-spring-module';
+        
+        const imageLayer = document.createElement('div');
+        imageLayer.className = 'wing-image-layer';
+        
+        moduleContainer.appendChild(imageLayer);
+        document.body.appendChild(moduleContainer);
+
+        // Функция автоматического пересчета размеров и координат под экраны телефонов
+        function resizeResponsiveModule() {
+            const card = document.getElementById('card');
+            if (!card) return;
+
+            // Измеряем реальные пиксели ширины и высоты открытки на экране в данный момент
+            const rect = card.getBoundingClientRect();
+            const currentWidth = rect.width;
+            const currentHeight = rect.height;
+
+            // Вычисляем коэффициент сжатия (на сколько процентов телефон уменьшил открытку относительно ПК версии в 350px)
+            const scaleFactor = currentWidth / 350;
+
+            // Передаем точные адаптивные размеры новой странице
+            document.documentElement.style.setProperty('--card-dynamic-w', `${currentWidth}px`);
+            document.documentElement.style.setProperty('--card-dynamic-h', `${currentHeight}px`);
+
+            // Пересчитываем твои пиксельные координаты ПК версии под размер мобилки
+            document.documentElement.style.setProperty('--bird-nowing-x', `${175 * scaleFactor}px`);
+            document.documentElement.style.setProperty('--bird-nowing-y', `${0 * scaleFactor}px`);
+            document.documentElement.style.setProperty('--wing-module-x', `${130 * scaleFactor}px`);
+            document.documentElement.style.setProperty('--wing-module-y', `${-35 * scaleFactor}px`);
+            document.documentElement.style.setProperty('--wing-module-w', `${500 * scaleFactor}px`);
+            document.documentElement.style.setProperty('--wing-module-h', `${500 * scaleFactor}px`);
+        }
+
+        // Запускаем расчет сразу и следим за переворотом экрана смартфона
+        window.addEventListener('resize', resizeResponsiveModule);
+        
+        // Отслеживаем старт пожара
+        const card = document.getElementById('card');
+        if (card) {
+            const observer = new MutationObserver((mutations) => {
+                mutations.forEach((mutation) => {
+                    if (mutation.attributeName === 'class' && card.classList.contains('burn-active')) {
+                        // Перед самым вылетом еще раз обновляем геометрию для идеальной точности
+                        resizeResponsiveModule();
+                        
+                        // Пауза после старта огня (3с горение + 2с твоя пауза = 5000мс)
+                        setTimeout(() => {
+                            document.body.classList.add('wing-go');
+                        }, 5000); 
+                        observer.disconnect();
+                    }
+                });
+            });
+            observer.observe(card, { attributes: true });
+        }
+    });
+</script>
+<!-- ========================================================================= -->
+<!-- ========================================================================= -->
+<!-- АДАПТИВНЫЙ МОДУЛЬ: СВЕТЛЫЙ ФОН ДЛЯ ТЕЛЕФОНОВ (БЕЗ ЗАТЕМНЕНИЯ)            -->
+<!-- ========================================================================= -->
+<style>
+    /* Поднимаем открытку и пружину на самый верхний слой */
+    .card-container, 
+    .global-wing-spring-module, 
+    .global-bird-nowing-page, 
+    .full-page-fire {
+        z-index: 100 !important;
+    }
+
+    /* Слой фотографии воспоминаний */
+    .bg-past-memory {
+        position: fixed;
+        inset: 0 !important; 
+        width: 100% !important;
+        height: 100% !important;
+        
+        /* 👇 СЮДА ВСТАВЬ ССЫЛКУ НА ФОТОГРАФИЮ ИЗ ПРОШЛОГО */
+        background-image: url('https://i.vgy.me/jgrX8q.png'); 
+        
+        background-size: cover !important;
+        background-position: center center !important;
+        background-repeat: no-repeat !important;
+        z-index: 1 !important; 
+        opacity: 0;
+        
+        /* Настройки для ПК по умолчанию (размыто и темно) */
+        filter: blur(8px) brightness(0.4) !important; 
+        transition: opacity 2s ease-in-out !important;
+    }
+    
+    /* 📱 НАСТРОЙКА ДЛЯ СМАРТФОНОВ: Убираем притемнение нафиг, оставляем только размытие */
+    @media (max-width: 767px) {
+        .bg-past-memory {
+            filter: blur(8px) brightness(1) !important; /* Родная яркость фотки, всё будет отлично видно! */
+        }
+    }
+    
+    /* Плавное проявление фоновой фотографии по прозрачности */
+    body.wing-go .bg-past-memory {
+        opacity: 1 !important;
+    }
+</style>
+
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        const oldLayer = document.querySelector('.bg-past-memory');
+        if (oldLayer) oldLayer.remove();
+
+        const bgMemory = document.createElement('div');
+        bgMemory.className = 'bg-past-memory';
+        
+        // Вставляем в самое начало body, чтобы фон рендерился строго ПОД открыткой
+        document.body.insertBefore(bgMemory, document.body.firstChild);
+    });
+</script>
+<!-- ========================================================================= -->
+<body>
+
+    <div class="card-container" id="card" onclick="openCard()">
+        <!-- Левая внутренняя сторона -->
+        <div class="inside-left">
+            <div class="inside-left-burned"></div>
+        </div>
+
+        <!-- Поворотная обложка -->
+        <div class="cover-hinge">
+            <div class="cover-side cover-front"></div>
+            <div class="cover-side cover-back"></div>
+            <div class="cover-side cover-back-burned"></div>
+        </div>
+    </div>
+
+    <!-- Тот самый гигантский огонь на весь экран -->
+    <div class="full-page-fire"></div>
+
+    <script>
+        let isOpened = false;
+        
+        /* ПРЯМАЯ ЖЕЛЕЗНАЯ ССЫЛКА НА ТВОЙ MP3 С ХОСТИНГА CATBOX */
+        const soundUrl = "https://files.catbox.moe/56wtzi.mp3";
+        
+        const dragonSound = new Audio(soundUrl);
+        dragonSound.preload = "auto";
+        dragonSound.load(); 
+
+        function openCard() {
+            // Веб-хак: Активируем аудио-контекст при самом первом клике пользователя
+            dragonSound.play().then(() => {
+                dragonSound.pause();
+                dragonSound.currentTime = 0;
+            }).catch(e => console.log("Поток разблокирован"));
+
+            if (isOpened) return;
+            isOpened = true;
+
+            const card = document.getElementById('card');
+            card.classList.add('opened');
+
+            // 1. Через 5 секунд (5000мс) ВКЛЮЧАЕТСЯ ЗВУК ДРАКОНА
+            setTimeout(() => {
+                dragonSound.play().catch(e => console.log("Ошибка звука:", e));
+                
+                // 2. Через 1 секунду ПОСЛЕ звука (итого 6 секунд от старта) — ВСПЫХИВАЕТ ТОТАЛЬНОЕ ПЛАМЯ НА ВЕСЬ ЭКРАН
+                setTimeout(() => {
+                    card.classList.add('burn-active');
+                    document.body.classList.add('fire-active');
+                }, 1000);
+
+            }, 5000);
+        }
+    </script>
+</body>
+</html>
